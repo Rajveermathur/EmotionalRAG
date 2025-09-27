@@ -9,10 +9,16 @@ from tqdm import tqdm
 
 sys.path.append(os.getcwd())
 
+# Some Call Functions
 from utils.functions import (call_chatglm2, call_gpt2, call_qwen2,
                              load_model_and_tokenizer)
 
-
+# Retrieval Function
+# C-M → multiplicative combo.
+# C-A → additive combo (default).
+# S-C → context first, then emotion.
+# S-S → emotion first, then context.
+# OriginalRAG → only context (like standard RAG)
 def retrieval(query, method="C-A"):
     role = query["role"]
     context_embedding = query["context_embedding"]
@@ -56,7 +62,7 @@ def retrieval(query, method="C-A"):
     scores = [context_distances[i] for i in inx]
     return nearest_docs, scores
 
-
+# Get Response Functions
 def get_response_characterllm(
     query, agent_llm, model, tokenizer, device, retrieval_method
 ):
@@ -81,6 +87,7 @@ Interviewer (speaking): {query}
     status = f"{character} is casually chatting with a man from the 21st century. {character} fully trusts the man who engage in conversation and shares everything {character} knows without reservation."
     related_dialogues, _ = retrieval(query, retrieval_method)
     concat_dialogues = "\n\n".join(related_dialogues)
+    # Fill in the role_system template
     role_system = role_system.format(
         character=character,
         loc_time=loc_time,
@@ -99,21 +106,24 @@ Interviewer (speaking): {query}
     query["model_output"] = response
     return query
 
-
+# For charactereval dataset
 def get_response_charactereval(
     query, agent_llm, model, tokenizer, device, retrieval_method
 ):
     context = query["context"]
     role = query["role"]
 
+    # Get role information
     role_information_json = role_informations[role]
     role_information = "\n".join(
         f"{key}：{value}" for key, value in role_information_json.items()
     )
 
+    # Get related dialogues
     related_dialogues, _ = retrieval(query, retrieval_method)
     concat_dialogues = "\n\n".join(related_dialogues)
 
+    # Construct the system prompt
     role_system = (
         f"【角色信息】\n"
         f"---\n"
@@ -142,18 +152,21 @@ def get_response_charactereval(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    # Which dataset to run, charactereval = Chinese, characterllm = English
     parser.add_argument(
         "--dataset",
         default="charactereval",
         choices=["charactereval", "characterllm"],
         help="Dataset",
     )
+    # Which LLM to use as the agent
     parser.add_argument(
         "--agent_llm",
         default="qwen",
         choices=["chatglm", "qwen", "gpt-3.5", "gpt-4"],
         help="Agent LLM",
     )
+    # Which retrieval method to use
     parser.add_argument(
         "--retrieval_method",
         default="C-A",
